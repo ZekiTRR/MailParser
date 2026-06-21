@@ -5,6 +5,7 @@ import (
 	"log"
 	"path/filepath"
 	"strings"
+	"MailParser/internal/storage"
 
 	"MailParser/internal/parser"
 )
@@ -18,7 +19,7 @@ func main() {
 		log.Fatalf("ошибка чтения папки: %v", err)
 	}
 
-	for _, path := range files {
+	for _, path := range files { // Отбрасываем первый аргумент
 		fmt.Println(strings.Repeat("=", 60))
 		fmt.Println("Обработка файла:", filepath.Base(path))
 		fmt.Println(strings.Repeat("=", 60))
@@ -43,6 +44,13 @@ func main() {
 			fmt.Printf("HTML сообщение (вывод сырого кода):\n%s\n", email.HTMLBody)
 		} else {
 			fmt.Println("[Тело письма пустое или содержит только неподдерживаемый формат]")
+		}
+
+		writeSuccess := storage.Write_to_json(email.TextBody)
+		if writeSuccess {
+			fmt.Println("Данные письма успешно записаны в cleaned.json")
+		} else {
+			fmt.Println("Ошибка при записи данных письма в cleaned.json")
 		}
 
 		// Бонус: выводим информацию о вложениях, если они есть
