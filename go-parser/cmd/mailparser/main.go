@@ -1,43 +1,64 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"path/filepath"
 	"strings"
-	"MailParser/internal/storage"
 
+	"MailParser/internal/config"
 	"MailParser/internal/parser"
+	"MailParser/internal/storage"
 )
 
 func main() {
-	folder := "D:\\Code\\MailParser\\input\\eml\\"
+	// Флаг -config задаёт путь к parser.json (дефолт — ../configs/parser.json)
+	configPath := flag.String("config", "../configs/parser.json", "путь к файлу конфигурации")
+	flag.Parse()
 
-	// Находим все EML файлы в папке
-	files, err := filepath.Glob(filepath.Join(folder, "*.eml"))
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		log.Fatalf("ошибка загрузки конфига: %v", err)
+	}
+
+	fmt.Printf("Входная папка:   %s\n", cfg.InputDir)
+	fmt.Printf("Выходная папка:  %s\n", cfg.OutputDir)
+	fmt.Println()
+
+	// Ищем все .eml файлы во входной папке
+	files, err := filepath.Glob(filepath.Join(cfg.InputDir, "*.eml"))
 	if err != nil {
 		log.Fatalf("ошибка чтения папки: %v", err)
 	}
 
-	for _, path := range files { // Отбрасываем первый аргумент
+	if len(files) == 0 {
+		fmt.Println("EML файлы не найдены в", cfg.InputDir)
+		return
+	}
+
+	fmt.Printf("Найдено EML файлов: %d\n\n", len(files))
+
+	// Обрабатываем каждый EML-файл
+	for _, path := range files {
 		fmt.Println(strings.Repeat("=", 60))
 		fmt.Println("Обработка файла:", filepath.Base(path))
 		fmt.Println(strings.Repeat("=", 60))
 
-		// Вызываем ОДНУ функцию вместо двух. Она делает всю работу за один сеанс I/O.
+		// Парсим EML → структура с заголовками и телом
 		email, err := parser.ParseEML(path)
 		if err != nil {
 			log.Printf("ошибка парсинга %s: %v", path, err)
 			continue
 		}
 
-		// Выводим метаданные письма
+		// Выводим метаданные
 		fmt.Printf("Отправитель: %s\n", email.From)
 		fmt.Printf("Получатель:  %s\n", email.To)
 		fmt.Printf("Тема письма: %s\n", email.Subject)
 		fmt.Println(strings.Repeat("-", 40))
 
-		// Логика отображения тела: приоритет отдаем чистому тексту, если его нет — выводим HTML
+		// Приоритет: plain text → HTML → пусто
 		if email.TextBody != "" {
 			fmt.Printf("Текстовое сообщение (Plain Text):\n%s\n", email.TextBody)
 		} else if email.HTMLBody != "" {
@@ -46,14 +67,15 @@ func main() {
 			fmt.Println("[Тело письма пустое или содержит только неподдерживаемый формат]")
 		}
 
-		writeSuccess := storage.Write_to_json(email.TextBody)
+		// Дописываем тело письма в cleaned.json
+		writeSuccess := storage.Write_to_json(email.TextBody, cfg.OutputDir)
 		if writeSuccess {
 			fmt.Println("Данные письма успешно записаны в cleaned.json")
 		} else {
 			fmt.Println("Ошибка при записи данных письма в cleaned.json")
 		}
 
-		// Бонус: выводим информацию о вложениях, если они есть
+		// Информация о вложениях
 		if len(email.Attachments) > 0 {
 			fmt.Println(strings.Repeat("-", 40))
 			fmt.Printf("Найдено вложений: %d\n", len(email.Attachments))
