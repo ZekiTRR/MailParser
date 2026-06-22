@@ -2,5 +2,6 @@
   "page_format": "A4",
   "alignment": "left",
   "font_name": "Times New Roman",
-  "font_size": 12
+  "font_size": 12,
+  "no_compress": true
 }
