@@ -1,1 +1,2 @@
 # Список Python-зависимостей
+python-docx
